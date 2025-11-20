@@ -3,8 +3,25 @@
 #include <iostream>
 #include <glm/glm.hpp>
 #include <vector>
+#include <cmath>
+#include <fstream>
 
-float pi = 3.14159f;
+const float PI = 3.14159f;
+
+unsigned char clip(float value) {
+    return value < 0 ? 0 : value > 255 ? 255 : (unsigned char)round(value);
+}
+
+void print_to_file(unsigned char *buffer, int size, std::string filepath)
+{
+    std::ofstream file(filepath.c_str());
+    for(int i = 0; i < size; i++) {
+        file << std::to_string(buffer[i]);
+        if(i < size - 1) file << ",";
+    }
+    file.close();
+}
+
 void grayscale(std::string filepath){
     int width, height, comps;
     int req_comps = 4;
@@ -14,7 +31,7 @@ void grayscale(std::string filepath){
     {
         new_buffer[i/4] = buffer[i]*0.2989 + buffer[i+1]*0.5870 + buffer[i+2]*0.1140;
     }
-    int result = stbi_write_png("res/textures/greyscale.png", width, height, 1, new_buffer, width);
+    int result = stbi_write_png("res/textures/Grayscale.png", width, height, 1, new_buffer, width);
     std::cout << "grayscale " << (result ? "success" : "fail") << std::endl;
 }
 
@@ -93,7 +110,7 @@ std::vector<float> non_max_suppression(std::string filepath, std::vector<float> 
         for(int x = 1; x < width - 1; x++){
             float angle = (*gradiant_angle_buffer)[y * width + x];
             float magnitude = gradiant_magnitude[y * width + x];
-            angle = fmod((angle * 180.0f / pi) + 180.0f, 180.0f);
+            angle = fmod((angle * 180.0f / PI) + 180.0f, 180.0f);
             float neighbor1 = 0.0f;
             float neighbor2 = 0.0f;
 
@@ -179,7 +196,7 @@ void hysteresis(std::string filepath, std::vector<float> double_thresholded, int
 
 void canny_edge_detection(){
     int width = 256, height = 256, comps = 1;
-    std::vector<float> noise_reduced = noise_reduction3x3("res/textures/greyscale.png", "res/textures/noise_reduced.png");
+    std::vector<float> noise_reduced = noise_reduction3x3("res/textures/Grayscale.png", "res/textures/noise_reduced.png");
     std::vector<float>* gradiant_angle = new std::vector<float>(width * height);
     std::vector<float> gradiant_magnitude = gradiant_intensity("res/textures/gradient_intensity.png", noise_reduced, gradiant_angle, width, height, comps);
     std::vector<float> non_max_suppressed = non_max_suppression("res/textures/non_max_suppressed.png", gradiant_magnitude, gradiant_angle, width, height, comps);
@@ -216,10 +233,110 @@ void halftone(std::string oldfilepath, std::string newfilepath){
     std::cout << "halftone " << (result ? "success" : "fail") << std::endl;
 }
 
+// helper for Floyd-Steinberg
+std::vector<float> propegate_error(int x, int y, int width, int height)
+{
+    std::vector<float> error_parts(4, 0);
+
+    const float ALPHA = 7.0f / 16.0f;
+    const float BETA = 3.0f / 16.0f;
+    const float GAMMA = 5.0f / 16.0f;
+    const float DELTA = 1.0f / 16.0f;
+
+    // pixel is bottom right
+    if(x == width - 1 && y == height - 1) {
+        return error_parts;
+
+    // pixel is in the middle of the image
+    } else if(x > 0 && x + 1 < width && y + 1 < height) {
+        error_parts[0] = ALPHA;
+        error_parts[1] = BETA;
+        error_parts[2] = GAMMA;
+        error_parts[3] = DELTA;
+
+    // pixel is left-most, but not bottom
+    } else if(x == 0 && y + 1 < height) {
+        error_parts[0] = ALPHA + BETA / 3.0f;
+        error_parts[1] = 0;
+        error_parts[2] = GAMMA + BETA / 3.0f;
+        error_parts[3] = DELTA + BETA / 3.0f;
+
+    // pixel is bottom middle
+    } else if(x + 1 < width) {
+        error_parts[0] = ALPHA + BETA + GAMMA + DELTA;
+        error_parts[1] = 0;
+        error_parts[2] = 0;
+        error_parts[3] = 0;
+
+    // pixel is right-most, but not bottom
+    } else if(y + 1 < height) {
+        error_parts[0] = 0;
+        error_parts[1] = BETA + (ALPHA + DELTA) / 2.0f;
+        error_parts[2] = GAMMA + (ALPHA + DELTA) / 2.0f;
+        error_parts[3] = 0;
+    }
+
+    return error_parts;
+}
+
+void floyd_steinberg(std::string grayscale_filepath, std::string output_filepath)
+{
+    int width, height, comps;
+    int req_comps = 1;
+    unsigned char *grayscaled = stbi_load(grayscale_filepath.c_str(), &width, &height, &comps, req_comps);
+    if(grayscaled == NULL) {
+        std::cout << "Must have grayscaled image for floyd steinberg" << std::endl;
+        delete(grayscaled);
+        return;
+    }
+
+    unsigned char floyd_steinberg[width * height] = {0};
+
+    for(int y = 0; y < height; y++) {
+        for(int x = 0; x < width; x++) {
+
+            //first convert to 4-bit range, then returns to 8-bit range, o.w. image is too dark
+            floyd_steinberg[y * width + x] = round(((float)grayscaled[y * width + x] / 255.0f * 15.0f)) / 15.0f * 255.0f;
+
+            float error = (float)(grayscaled[y * width + x] - floyd_steinberg[y * width + x]);
+
+            std::vector<float> error_parts = propegate_error(x, y, width, height);
+
+            // alpha * error
+            if(error_parts[0] > 0) {
+                grayscaled[y * width + x + 1] = clip(grayscaled[y * width + x + 1] + error * error_parts[0]);
+            }
+
+            // beta * error
+            if(error_parts[1] > 0) {
+                grayscaled[(y + 1) * width + x - 1] = clip(grayscaled[(y + 1) * width + x - 1] + error * error_parts[1]);
+            }
+
+            //gamma * error
+            if(error_parts[2] > 0) {
+                grayscaled[(y + 1) * width + x] = clip(grayscaled[(y + 1) * width + x] + error * error_parts[2]);
+            }
+
+            //delta * error
+            if(error_parts[3] > 0) {
+                grayscaled[(y + 1) * width + x + 1] = clip(grayscaled[(y + 1) * width + x + 1] + error * error_parts[3]);
+            }
+
+        }
+    }
+
+    delete(grayscaled);
+
+    int result = stbi_write_png(output_filepath.c_str(), width, height, comps, floyd_steinberg, width);
+    std::cout << "floyd-steinberg " << (result ? "success" : "fail") << std::endl;
+
+}
+
 int main(void)
 {
     grayscale("res/textures/Lenna.png");
     canny_edge_detection();
-    halftone("res/textures/greyscale.png", "res/textures/halftone.png");
+    halftone("res/textures/Grayscale.png", "res/textures/Halftone.png");
+    floyd_steinberg("res/textures/Grayscale.png", "res/textures/FloydSteinberg.png");
     return 0;
 }
