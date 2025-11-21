@@ -31,6 +31,7 @@ void grayscale(std::string filepath){
     {
         new_buffer[i/4] = buffer[i]*0.2989 + buffer[i+1]*0.5870 + buffer[i+2]*0.1140;
     }
+    print_to_file(new_buffer, width * height, "res/textures/Grayscale.txt");
     int result = stbi_write_png("res/textures/Grayscale.png", width, height, 1, new_buffer, width);
     std::cout << "grayscale " << (result ? "success" : "fail") << std::endl;
 }
@@ -190,6 +191,7 @@ void hysteresis(std::string filepath, std::vector<float> double_thresholded, int
             }
         }
     }
+    print_to_file(new_buffer, width * height, "res/textures/Canny.txt");
     int result = stbi_write_png(filepath.c_str(), width, height, req_comps, new_buffer, width);
     std::cout << "canny " << (result ? "success" : "fail") << std::endl;
 }
@@ -228,7 +230,7 @@ void halftone(std::string oldfilepath, std::string newfilepath){
             }
         }    
     }
-    
+    print_to_file(new_buffer, new_width * new_height, "res/textures/Halftone.txt");
     int result = stbi_write_png(newfilepath.c_str(), new_width, new_height, req_comps, new_buffer, new_width);
     std::cout << "halftone " << (result ? "success" : "fail") << std::endl;
 }
@@ -326,7 +328,7 @@ void floyd_steinberg(std::string grayscale_filepath, std::string output_filepath
     }
 
     delete(grayscaled);
-
+    print_to_file(floyd_steinberg, width * height, "res/textures/FloydSteinberg.txt");
     int result = stbi_write_png(output_filepath.c_str(), width, height, comps, floyd_steinberg, width);
     std::cout << "floyd-steinberg " << (result ? "success" : "fail") << std::endl;
 
@@ -334,7 +336,7 @@ void floyd_steinberg(std::string grayscale_filepath, std::string output_filepath
 
 int main(void)
 {
-    grayscale("res/textures/Lenna.png");
+    grayscale("../Lenna.png");
     canny_edge_detection();
     halftone("res/textures/Grayscale.png", "res/textures/Halftone.png");
     floyd_steinberg("res/textures/Grayscale.png", "res/textures/FloydSteinberg.png");
