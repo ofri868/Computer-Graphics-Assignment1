@@ -31,8 +31,8 @@ void grayscale(std::string filepath){
     {
         new_buffer[i/4] = buffer[i]*0.2989 + buffer[i+1]*0.5870 + buffer[i+2]*0.1140;
     }
-    print_to_file(new_buffer, width * height, "res/textures/Grayscale.txt");
-    int result = stbi_write_png("res/textures/Grayscale.png", width, height, 1, new_buffer, width);
+    print_to_file(new_buffer, width * height, "res/results/Grayscale.txt");
+    int result = stbi_write_png("res/results/Grayscale.png", width, height, 1, new_buffer, width);
     std::cout << "grayscale " << (result ? "success" : "fail") << std::endl;
 }
 
@@ -191,19 +191,19 @@ void hysteresis(std::string filepath, std::vector<float> double_thresholded, int
             }
         }
     }
-    print_to_file(new_buffer, width * height, "res/textures/Canny.txt");
+    print_to_file(new_buffer, width * height, "res/results/Canny.txt");
     int result = stbi_write_png(filepath.c_str(), width, height, req_comps, new_buffer, width);
     std::cout << "canny " << (result ? "success" : "fail") << std::endl;
 }
 
 void canny_edge_detection(){
     int width = 256, height = 256, comps = 1;
-    std::vector<float> noise_reduced = noise_reduction3x3("res/textures/Grayscale.png", "res/textures/noise_reduced.png");
+    std::vector<float> noise_reduced = noise_reduction3x3("res/results/Grayscale.png", "res/results/noise_reduced.png");
     std::vector<float>* gradiant_angle = new std::vector<float>(width * height);
-    std::vector<float> gradiant_magnitude = gradiant_intensity("res/textures/gradient_intensity.png", noise_reduced, gradiant_angle, width, height, comps);
-    std::vector<float> non_max_suppressed = non_max_suppression("res/textures/non_max_suppressed.png", gradiant_magnitude, gradiant_angle, width, height, comps);
-    std::vector<float> double_thresholded = double_thresholding("res/textures/double_thresholded.png", non_max_suppressed, 50, 100, width, height, comps);
-    hysteresis("res/textures/Canny.png", double_thresholded, width, height, comps);
+    std::vector<float> gradiant_magnitude = gradiant_intensity("res/results/gradient_intensity.png", noise_reduced, gradiant_angle, width, height, comps);
+    std::vector<float> non_max_suppressed = non_max_suppression("res/results/non_max_suppressed.png", gradiant_magnitude, gradiant_angle, width, height, comps);
+    std::vector<float> double_thresholded = double_thresholding("res/results/double_thresholded.png", non_max_suppressed, 50, 100, width, height, comps);
+    hysteresis("res/results/Canny.png", double_thresholded, width, height, comps);
 }
 
 void halftone(std::string oldfilepath, std::string newfilepath){
@@ -230,7 +230,7 @@ void halftone(std::string oldfilepath, std::string newfilepath){
             }
         }    
     }
-    print_to_file(new_buffer, new_width * new_height, "res/textures/Halftone.txt");
+    print_to_file(new_buffer, new_width * new_height, "res/results/Halftone.txt");
     int result = stbi_write_png(newfilepath.c_str(), new_width, new_height, req_comps, new_buffer, new_width);
     std::cout << "halftone " << (result ? "success" : "fail") << std::endl;
 }
@@ -328,7 +328,7 @@ void floyd_steinberg(std::string grayscale_filepath, std::string output_filepath
     }
 
     delete(grayscaled);
-    print_to_file(floyd_steinberg, width * height, "res/textures/FloydSteinberg.txt");
+    print_to_file(floyd_steinberg, width * height, "res/results/FloydSteinberg.txt");
     int result = stbi_write_png(output_filepath.c_str(), width, height, comps, floyd_steinberg, width);
     std::cout << "floyd-steinberg " << (result ? "success" : "fail") << std::endl;
 
@@ -338,7 +338,7 @@ int main(void)
 {
     grayscale("../Lenna.png");
     canny_edge_detection();
-    halftone("res/textures/Grayscale.png", "res/textures/Halftone.png");
-    floyd_steinberg("res/textures/Grayscale.png", "res/textures/FloydSteinberg.png");
+    halftone("res/results/Grayscale.png", "res/results/Halftone.png");
+    floyd_steinberg("res/results/Grayscale.png", "res/results/FloydSteinberg.png");
     return 0;
 }

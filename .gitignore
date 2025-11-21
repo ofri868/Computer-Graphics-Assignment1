@@ -1,3 +1,5 @@
 .vscode/*
 bin/*
 !bin/.keep
+!bin/results
+submission
